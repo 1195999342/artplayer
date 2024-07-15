@@ -3,21 +3,15 @@
 
 include_once './config.php';
 include_once './class/Http.php';
-if (check_wap()) {
-    if ($_GET['url'] == '') {
-        exit($homewap);
-    }
-} else {
-    if ($_GET['url'] == '') {
-        exit($home);
-    }
+if ($_GET['url'] == '') {
+    exit('<body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; color: greenyellow; background-color: black;"><h3>播放地址为空</h3></body>');
 }
 
 $address = "";
 $url = preg_replace("/url=/", "", $_SERVER["QUERY_STRING"], 1);
-//判断url m3u8 MP4 结尾
+//判断url 包含 m3u8 MP4
 
-if (substr($url, -5) == ".m3u8" || substr($url, -4) == ".mp4") {
+if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
     $address = $url;
 } else {
     //先查询缓存
@@ -105,6 +99,7 @@ if (substr($url, -5) == ".m3u8" || substr($url, -4) == ".mp4") {
     if (adressO.endsWith('.m3u8')) {
         type = 'm3u8';
     }
+    var url = '<?php echo $url ?>';
     var adress = get_JxUrl(adressO);
     var danmuku =  '<?php echo $config['dmapi'] . $url ?>';
     const art = new Artplayer({
@@ -112,7 +107,7 @@ if (substr($url, -5) == ".m3u8" || substr($url, -4) == ".mp4") {
         customType: {
             m3u8: playM3u8,
         },
-        id: '<?php echo md5($address) ?>',
+        id: '<?php echo md5($url) ?>',
         container: '.artplayer-app',
         url: adress,
         //autoSize: true,
@@ -130,7 +125,7 @@ if (substr($url, -5) == ".m3u8" || substr($url, -4) == ".mp4") {
         setting: true,
         plugins: [
             artplayerPluginDanmuku({
-                danmuku: '<?php echo $config['dmapi'] . $url ?>',
+                danmuku: danmuku,
                 // 以下为非必填
                 speed: 5, // 弹幕持续时间，范围在[1 ~ 10]
                 margin: [10, '25%'], // 弹幕上下边距，支持像素数字和百分比
@@ -166,7 +161,7 @@ if (substr($url, -5) == ".m3u8" || substr($url, -4) == ".mp4") {
                             url: danmuku,
                             contentType: "application/json",
                             data: JSON.stringify({
-                                player: '<?php echo $url ?>',
+                                player: url,
                                 text: danmu.text,
                                 color: danmu.color,
                                 time: danmu.time,

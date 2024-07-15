@@ -1,30 +1,14 @@
 <?php
 $config =  array (
-    'name' => '一款优秀的 HTML5 播放器', //播放器名称。
+    'name' => 'kansha播放器', //播放器名称。
 
     'video' => 'https://res11.bignox.com/player/www/101ae5b183a03384c8005e2a827bc4fc/GDCHDGCCHrh8FpZ.mp4', //无地址引导页背景视频地址。
-
-    'aes_key' => 'ARTPLAYER2023217',//aeskey16位需修改setting.js底部一致。
-
-    'aes_iv' => 'Artplayerapiban1',//aesiv16位需修改setting.js底部一致。
 
     'interface' => 'https://json.vipjx.cnow.eu.org/?url=',//JSON接口。
 
     'Standby' => 'https://proxy.kansha.vip/proxy_url=https://json.vipjx.cnow.eu.org/?url=,https://json.2s0.cn:5678/home/api?type=ys&uid=2673453&key=dghoqstuwxzOTX1256&url=',//备用json接口多个请使用,号隔开。
 
-    'fanhuileixing' => '1', //播放器返回模式，参数1为网页播放器，参数2为json。(api.php?url=地址访问)
-
     'iptime' => '20', //限制每个IP每分钟访问次数。
-
-    'fangdaoleixing' => '',//返回模式为2时，留空不需带key直接访问，0密钥错误时输出404，1带自定义输出url。
-
-    'token_ua' => '',//返回模式为2时，限制指定UA来源访问，留空不开启
-
-    'token_key' => '123456789',//返回模式为2时，防盗类型为0或者1时，访问api.php?key=12345678&url=地址
-
-    'token_url' => 'https://www.baidu.com',//返回模式为2时，防盗类型为1时，限制UA开启时，输出的自定义链接
-
-    'theme' => '#165DFF',//播放器进度条颜色设置。
 
     'background' => 'artplayer/img/background.jpg',//播放器背景图片。
 
