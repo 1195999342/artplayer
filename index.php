@@ -14,14 +14,21 @@ $url = preg_replace("/url=/", "", $_SERVER["QUERY_STRING"], 1);
 if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
     $address = $url;
 } else {
-    //先查询缓存
-    $redis = new Redis();
-    $redis->connect($config['redis']['host'], $config['redis']['port']);
-    if ($config['redis']['password']) {
-        $redis->auth($config['redis']['password']);
-    }
     $key = md5($url);
-    $cache = $redis->get($key);
+    $cache = "";
+    if ($config['redis']['open']) {
+        //先查询缓存
+        $redis = new Redis();
+        $redis->connect($config['redis']['host'], $config['redis']['port']);
+        if ($config['redis']['password']) {
+            $redis->auth($config['redis']['password']);
+        }
+        $key = md5($url);
+        $cache = "";
+        if ($config['redis']['open']) {
+            $cache = $redis->get($key);
+        }
+    }
     if ($cache) {
         $address = $cache;
     } else {
@@ -29,6 +36,9 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
         $result = Http::geturl($u);
         if ($result["code"] == 200) {
             $address = $result["url"];
+            if($address){
+                $address = Http::getRedirectedUrl($address);
+            }
         }
 
         if ($address == "" && $config['Standby']) {
@@ -38,6 +48,9 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
                 $result = Http::geturl($api);
                 if ($result['code'] == 200) {
                     $address = $result["url"];
+                    if($address){
+                        $address = Http::getRedirectedUrl($address);
+                    }
                     break;
                 }
             }
@@ -95,13 +108,18 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
 <script>
     var type = "";
     var adressO = '<?php echo $address ?>';
-    //如果以.m3u8结尾，则播放m3u8
-    if (adressO.endsWith('.m3u8')) {
-        type = 'm3u8';
-    }
+
     var url = '<?php echo $url ?>';
     var adress = get_JxUrl(adressO);
-    var danmuku =  '<?php echo $config['dmapi'] . $url ?>';
+    //获取重定向后的地址
+    //adress = getRedirectedUrl(adress);
+    //如果以.m3u8结尾，则播放m3u8
+    if (adress.endsWith('.m3u8')) {
+        type = 'm3u8';
+    }else if (adress.endsWith('.mp4')) {
+        type ='mp4';
+    }
+    var danmuku = '<?php echo $config['dmapi'] . $url ?>';
     const art = new Artplayer({
         type: type,
         customType: {
@@ -112,9 +130,11 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
         url: adress,
         fastForward: true,
         lock: true,
-        autoSize: true,
+        //autoSize: true,
+        airplay: true,
+        playsInline: true,
         fullscreen: true,
-        fullscreenWeb: true,
+        //fullscreenWeb: true,
         autoOrientation: true,
         autoplay: true,
         autoMini: true,
@@ -190,6 +210,23 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
         } else {
             art.notice.show = 'Unsupported playback format: m3u8';
         }
+    }
+
+    function getRedirectedUrl(url) {
+        var redirectedUrl = null;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, false); // 设置为同步请求
+        xhr.setRequestHeader('Range', 'bytes=0-0'); // 请求只获取第一个字节
+
+        xhr.onreadystatechange = function () {
+            console.log("xhr", xhr)
+            if (xhr.readyState === 4) {
+                redirectedUrl = xhr.responseURL
+            }
+        };
+        xhr.send();
+        console.log('redirectedUrl', redirectedUrl);
+        return redirectedUrl;
     }
 
     art.on('ready', () => {

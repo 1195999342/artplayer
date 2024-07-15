@@ -22,6 +22,27 @@ class Http{
         return $output;
     }
 
+    //获取重定向后的地址
+    function getRedirectedUrl($url) {
+        $ch = curl_init($url);
+        // 设置 cURL 选项
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true); // 获取响应头
+        curl_setopt($ch, CURLOPT_NOBODY, true); // 只获取头部信息，不下载响应体
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // 跟随重定向
+        // 执行请求
+        $response = curl_exec($ch);
+        // 检查是否有错误
+        if (curl_errno($ch)) {
+            echo 'Error:' . curl_error($ch);
+        }
+        // 获取最终的 URL
+        $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        // 关闭 cURL 会话
+        curl_close($ch);
+        return $finalUrl;
+    }
+
     public static function posturl($url,$data){
         $data  = json_encode($data);
         $headerArray =array("Content-type:application/json;charset='utf-8'","Accept:application/json");

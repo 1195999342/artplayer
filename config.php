@@ -29,6 +29,7 @@ $config =  array (
     'pbgjz' => '操ABCDEFGHIJKLMNOPQRSTUVWSYZabcdefghijklmnopqrstuvwsyz',//弹幕敏感关键字限制。
 
     'redis' => array(
+        'open' => true,
         'host' => '127.0.0.1',
         'port' => 6379,
         'password' => ''), //redis配置，留空则不开启缓存。
