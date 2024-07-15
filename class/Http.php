@@ -59,9 +59,8 @@ if($check){
   $redis->incr($key);
   $count = $redis->get($key);
   if($count > $config['iptime']){
-  header('Content-type:text/json;charset=utf-8');
-  exit(json_encode(["code"=>100,"msg"=>"当前IP[60]秒内请求次数已达到限制的[$config[iptime]]次,请耐心等待下一个[60]秒."],456));
-  //  exit('该IP请求太频繁，请稍后再试！');
+      header('Content-Type: text/html;charset=utf-8');
+      exit('<body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; color: greenyellow; background-color: black;"><h3>'."当前IP[60]秒内请求次数已达到限制的[$config[iptime]]次,请耐心等待下一个[60]秒".'</h3></body>');
 }
 }else{
   $redis->incr($key);
