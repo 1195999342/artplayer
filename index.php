@@ -110,16 +110,18 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
     var adressO = '<?php echo $address ?>';
 
     var url = '<?php echo $url ?>';
-    var adress = get_JxUrl(adressO);
+
     //获取重定向后的地址
     //adress = getRedirectedUrl(adress);
     //如果包含.m3u8 ，则播放m3u8
-    if (adress.includes('.m3u8')) {
+    if (adressO.includes('.m3u8')) {
         type = 'm3u8';
-    } else if (adress.includes('.mp4')) {
+    } else if (adressO.includes('.mp4')) {
         type = 'mp4';
     }
+    var adress = get_JxUrl(adressO);
     var danmuku = '<?php echo $config['dmapi'] . $url ?>';
+    console.log(adressO,type,adress)
     const art = new Artplayer({
         type: type,
         customType: {

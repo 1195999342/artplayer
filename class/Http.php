@@ -23,7 +23,7 @@ class Http{
     }
 
     //获取重定向后的地址
-    function getRedirectedUrl($url) {
+    public static function getRedirectedUrl($url) {
         $ch = curl_init($url);
         // 设置 cURL 选项
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -77,40 +77,40 @@ $key=get_real_ip();
 $limit = $config['iptime'];
 $check = $redis->exists($key);
 if($check){
-  $redis->incr($key);
-  $count = $redis->get($key);
-  if($count > $config['iptime']){
-      header('Content-Type: text/html;charset=utf-8');
-      exit('<body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; color: greenyellow; background-color: black;"><h3>'."当前IP[60]秒内请求次数已达到限制的[$config[iptime]]次,请耐心等待下一个[60]秒".'</h3></body>');
-}
+    $redis->incr($key);
+    $count = $redis->get($key);
+    if($count > $config['iptime']){
+        header('Content-Type: text/html;charset=utf-8');
+        exit('<body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; color: greenyellow; background-color: black;"><h3>'."当前IP[60]秒内请求次数已达到限制的[$config[iptime]]次,请耐心等待下一个[60]秒".'</h3></body>');
+    }
 }else{
-  $redis->incr($key);
-  //限制时间为60秒
-  $redis->expire($key,60);
+    $redis->incr($key);
+    //限制时间为60秒
+    $redis->expire($key,60);
 }
 $count = $redis->get($key);
 //echo '第 '.$count.' 次请求';
 //获取客户端真实ip地址
 function get_real_ip(){
-  static $realip;
-  if(isset($_SERVER)){
-    if(isset($_SERVER['HTTP_X_FORWARDED_FOR'])){
-      $realip=$_SERVER['HTTP_X_FORWARDED_FOR'];
-    }else if(isset($_SERVER['HTTP_CLIENT_IP'])){
-      $realip=$_SERVER['HTTP_CLIENT_IP'];
+    static $realip;
+    if(isset($_SERVER)){
+        if(isset($_SERVER['HTTP_X_FORWARDED_FOR'])){
+            $realip=$_SERVER['HTTP_X_FORWARDED_FOR'];
+        }else if(isset($_SERVER['HTTP_CLIENT_IP'])){
+            $realip=$_SERVER['HTTP_CLIENT_IP'];
+        }else{
+            $realip=$_SERVER['REMOTE_ADDR'];
+        }
     }else{
-      $realip=$_SERVER['REMOTE_ADDR'];
+        if(getenv('HTTP_X_FORWARDED_FOR')){
+            $realip=getenv('HTTP_X_FORWARDED_FOR');
+        }else if(getenv('HTTP_CLIENT_IP')){
+            $realip=getenv('HTTP_CLIENT_IP');
+        }else{
+            $realip=getenv('REMOTE_ADDR');
+        }
     }
-  }else{
-    if(getenv('HTTP_X_FORWARDED_FOR')){
-      $realip=getenv('HTTP_X_FORWARDED_FOR');
-    }else if(getenv('HTTP_CLIENT_IP')){
-      $realip=getenv('HTTP_CLIENT_IP');
-    }else{
-      $realip=getenv('REMOTE_ADDR');
-    }
-  }
-  return $realip;
+    return $realip;
 }
 
 function check_wap() {
