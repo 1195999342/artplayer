@@ -36,7 +36,7 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
         $result = Http::geturl($u);
         if ($result["code"] == 200) {
             $address = $result["url"];
-            if($address){
+            if ($address && check_wap()) {
                 $address = Http::getRedirectedUrl($address);
             }
         }
@@ -48,7 +48,7 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
                 $result = Http::geturl($api);
                 if ($result['code'] == 200) {
                     $address = $result["url"];
-                    if($address){
+                    if ($address && check_wap()) {
                         $address = Http::getRedirectedUrl($address);
                     }
                     break;
@@ -113,11 +113,11 @@ if (strstr($url, '.m3u8') || strstr($url, '.mp4')) {
     var adress = get_JxUrl(adressO);
     //获取重定向后的地址
     //adress = getRedirectedUrl(adress);
-    //如果以.m3u8结尾，则播放m3u8
-    if (adress.endsWith('.m3u8')) {
+    //如果包含.m3u8 ，则播放m3u8
+    if (adress.includes('.m3u8')) {
         type = 'm3u8';
-    }else if (adress.endsWith('.mp4')) {
-        type ='mp4';
+    } else if (adress.includes('.mp4')) {
+        type = 'mp4';
     }
     var danmuku = '<?php echo $config['dmapi'] . $url ?>';
     const art = new Artplayer({
