@@ -20,6 +20,7 @@
 
     <script src="artplayer/js/artplayer.js"></script>
     <script src="artplayer/js/hls.min.js"></script>
+    <script src="artplayer/js/jxad.js"></script>
 
 </head>
 <body>
@@ -34,6 +35,7 @@
     }
 
     let videoUrl = getQuery("url");
+    let playerUrl = get_JxUrl(videoUrl);
 
     if (!videoUrl) {
         document.body.innerHTML = '<h3 style="color:greenyellow;text-align:center;margin-top:40vh;">播放地址为空</h3>';
@@ -42,7 +44,7 @@
 
     const art = new Artplayer({
         container: '.artplayer-app',
-        url: videoUrl,
+        url: playerUrl,
         autoplay: true,
         playsInline: true,
         fullscreen: true,

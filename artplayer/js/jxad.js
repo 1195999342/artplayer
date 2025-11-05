@@ -1,61 +1,45 @@
 function get_JxUrl(urlo) {
-    let type = '';
-    let host = urlo.replace(/.*?:?\/\//g, '').split('/')[0];
-
-    if (host.includes('bf')) type = 'bf';
-    else if (host.includes('lz')) type = 'lz';
-    else if (host.includes('ff')) type = 'ff';
-
-    if (!type) return urlo; //无需处理的直接返回
-
     try {
         let urlData = getM3u8Content(urlo);
         urlo = urlData.url;
         let content = urlData.content;
 
         let tsListArr = content.split('\n');
-        let tsIndexArr = []; // 需要删除的行
-        let lastNum = 0;     // 修复点：初始化为 0
+        let toRemove = [];
 
         for (let i = 0; i < tsListArr.length; i++) {
-            let line = tsListArr[i];
-            if (!line.endsWith('.ts')) continue;
+            let line = tsListArr[i].trim();
 
-            if (type === 'bf') {
-                if (line.includes('adjump')) {
-                    tsIndexArr.push(i, i - 1);
-                }
-            } else if (type === 'lz' || type === 'ff') {
-                // 取 ts 文件名后 6 位数字
-                let num = parseInt(line.replace(/.*?([0-9]{6})\.ts$/, '$1'));
-                if (!isNaN(num)) {
-                    if (num !== 0 && num !== lastNum + 1) {
-                        tsIndexArr.push(i - 1, i);
-                    }
-                    lastNum = num;
+            // 发现广告 ts：包含 adjump / ad / adverts
+            if (line.endsWith('.ts') && /adjump|ad-|advert|ads|\/ad\//i.test(line)) {
+                // 删除当前行
+                toRemove.push(i);
+                // 前面紧跟的 #EXTINF 一并删掉
+                if (i > 0 && tsListArr[i - 1].startsWith('#EXTINF')) {
+                    toRemove.push(i - 1);
                 }
             }
         }
 
-        // 去重 + 排序 ↓↓↓
-        tsIndexArr = [...new Set(tsIndexArr)].sort((a, b) => b - a);
-        tsIndexArr.forEach(index => {
-            if (index >= 0 && index < tsListArr.length) {
-                tsListArr.splice(index, 1);
-            }
-        });
+        // 去重 + 倒序删除，避免索引错乱
+        toRemove = [...new Set(toRemove)].sort((a, b) => b - a);
+        toRemove.forEach(index => tsListArr.splice(index, 1));
 
-        // 前缀（ts 所在目录）
+        // 构造 ts 完整路径前缀
         let base = urlo.replace(/\/[^\/]*$/, '');
 
         for (let i = 0; i < tsListArr.length; i++) {
             if (tsListArr[i].endsWith('.ts')) {
-                tsListArr[i] = base + '/' + tsListArr[i];
+                // 若 ts 已经是绝对路径，则不动
+                if (!tsListArr[i].startsWith('http')) {
+                    // 去掉开头的 / 避免双斜杠
+                    tsListArr[i] = base + '/' + tsListArr[i].replace(/^\//, '');
+                }
             }
         }
 
         let newM3u8 = tsListArr.join('\n');
-        let blob = new Blob([newM3u8], {type: 'application/vnd.apple.mpegURL'});
+        let blob = new Blob([newM3u8], { type: 'application/vnd.apple.mpegURL' });
         return URL.createObjectURL(blob);
 
     } catch (e) {
@@ -64,19 +48,20 @@ function get_JxUrl(urlo) {
     }
 }
 
-//递归获取真实 m3u8 内容
+
+// 递归获取真实 m3u8 内容
 function getM3u8Content(url) {
     let xhr = new XMLHttpRequest();
     xhr.open('GET', url, false);
     xhr.send();
     if (xhr.status === 200) {
         let text = xhr.responseText;
-        let match = text.match(/.*?\.m3u8/);
+        let match = text.match(/\/?[^"\s']+\.m3u8/);
         if (match) {
-            url = url.replace(/\/[^\/]*$/, '') + '/' + match[0];
+            url = url.replace(/\/[^\/]*$/, '') + '/' + match[0].replace(/^\//, '');
             return getM3u8Content(url);
         }
-        return {url: url, content: text};
+        return { url: url, content: text };
     }
-    return {url: url, content: ''};
+    return { url: url, content: '' };
 }
