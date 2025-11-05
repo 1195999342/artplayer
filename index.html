@@ -28,23 +28,22 @@
 <div class="artplayer-app"></div>
 
 <script>
-    // 读取 URL 参数
     function getQuery(key) {
         const query = new URLSearchParams(window.location.search);
         return query.get(key);
     }
 
     let videoUrl = getQuery("url");
-    let playerUrl = get_JxUrl(videoUrl);
 
     if (!videoUrl) {
         document.body.innerHTML = '<h3 style="color:greenyellow;text-align:center;margin-top:40vh;">播放地址为空</h3>';
         throw new Error("播放地址为空");
     }
 
+    // 先随便给一个占位地址
     const art = new Artplayer({
         container: '.artplayer-app',
-        url: playerUrl,
+        url: '', // 先不设置
         autoplay: true,
         playsInline: true,
         fullscreen: true,
@@ -52,9 +51,7 @@
         theme: '#23ade5',
         fastForward: true,
         lock: true,
-        //autoSize: true,
         airplay: true,
-        //fullscreenWeb: true,
         autoOrientation: true,
         autoMini: true,
         flip: true,
@@ -73,11 +70,17 @@
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = url;
                 } else {
-                    art.notice.show = '该浏览器不支持 m3u8 播放';
+                    art.notice.show('该浏览器不支持 m3u8 播放');
                 }
             },
         },
     });
+
+    // ✅ 放到最后再执行解析
+    let playerUrl = get_JxUrl(videoUrl);
+
+    // ✅ 使用 Artplayer API 切换视频源
+    art.switchUrl(playerUrl);
 
 </script>
 
