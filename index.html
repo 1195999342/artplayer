@@ -20,6 +20,7 @@
 
     <script src="artplayer/js/artplayer.js"></script>
     <script src="artplayer/js/hls.min.js"></script>
+
 </head>
 <body>
 
@@ -47,6 +48,19 @@
         fullscreen: true,
         pip: true,
         theme: '#23ade5',
+        fastForward: true,
+        lock: true,
+        //autoSize: true,
+        airplay: true,
+        //fullscreenWeb: true,
+        autoOrientation: true,
+        autoMini: true,
+        flip: true,
+        playbackRate: true,
+        aspectRatio: true,
+        screenshot: true,
+        hotkey: true,
+        setting: true,
         customType: {
             m3u8: function (video, url, art) {
                 if (Hls.isSupported()) {
