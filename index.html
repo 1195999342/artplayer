@@ -1,230 +1,227 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
+
 <head>
-    <meta charset="UTF-8"/>
-    <title>视频播放</title>
-    <meta name="referrer" content="no-referrer">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频播放器</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+
     <style>
-        html, body {
+        body {
             margin: 0;
             padding: 0;
-            background: black;
-            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            touch-action: manipulation;
         }
+
         .artplayer-app {
-            width: 100%;
+            width: 100vw;
             height: 100vh;
             position: relative;
         }
-        
+
         .message-overlay {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px 40px;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
-            text-align: center;
-            z-index: 9999; /* 提高z-index确保在播放器上方 */
             display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #000000cc;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            text-align: center;
+            font-size: 18px;
+            color: wheat;
         }
-        
+
         .message-overlay.show {
-            display: block;
+            display: flex;
         }
-        
+
         .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 2s linear infinite;
-            margin: 0 auto 15px;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
         }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        #playerContainer {
+            width: 100%;
+            height: 100%;
         }
     </style>
-
-    <script src="artplayer/js/artplayer.js"></script>
-    <script src="artplayer/js/hls.min.js"></script>
-
 </head>
-<body>
+
+<body ontouchstart>
 
 <div class="artplayer-app">
+
+    <!-- 加载提示 -->
     <div class="message-overlay show" id="loadingMessage">
         <div class="loading-spinner"></div>
         <div id="loadingText">正在解析视频地址...</div>
         <div id="countdownText"></div>
     </div>
-    <div class="message-overlay" id="errorMessage">
-        播放失败，请更换其他线路！
-    </div>
-    <div class="message-overlay" id="playErrorMessage">
-        视频无法播放，请更换其他线路！
-    </div>
+
+    <!-- 解析错误 -->
+    <div class="message-overlay" id="errorMessage">播放失败，请更换其他线路！</div>
+
+    <!-- 播放器内部错误（HLS/MSE） -->
+    <div class="message-overlay" id="playErrorMessage">视频无法播放，请更换其他线路！</div>
+
+    <!-- 播放器挂载点：永远不要删除它 -->
+    <div id="playerContainer"></div>
 </div>
 
 <script>
-    // 读取 URL 参数
+
+    /* --------------------------
+       工具方法
+    --------------------------- */
     function getQuery(key) {
-        const query = new URLSearchParams(window.location.search);
-        return query.get(key);
+        return new URLSearchParams(window.location.search).get(key);
     }
 
-    let videoUrl = getQuery("url");
-
-    if (!videoUrl) {
-        document.body.innerHTML = '<h3 style="color:greenyellow;text-align:center;margin-top:40vh;">播放地址为空</h3>';
-        throw new Error("播放地址为空");
-    }
-
-    // 检查是否为需要解析的视频网站链接
     function needParse(url) {
-        const sites = [
-            'v.qq.com',
-            'iqiyi.com',
-            'youku.com',
-            'mgtv.com',
-            'bilibili.com'
-        ];
-        
-        return sites.some(site => url.includes(site));
+        return ['v.qq.com', 'iqiyi.com', 'youku.com', 'mgtv.com', 'bilibili.com']
+            .some(site => url.includes(site));
     }
 
-    // 使用普通 AJAX 解析视频链接
-    function parseVideoUrl(url) {
-        return new Promise((resolve) => {
-            if (!needParse(url)) {
-                // 不需要解析的链接直接 resolve
-                resolve(url);
-                return;
-            }
-            
-            // 显示加载提示
-            const loadingMessage = document.getElementById('loadingMessage');
-            const loadingText = document.getElementById('loadingText');
-            const countdownText = document.getElementById('countdownText');
-            loadingMessage.classList.add('show');
-            
-            // 设置超时时间
-            const timeoutMs = 20000; // 20秒超时
-            const startTime = Date.now();
-            
-            // 更新倒计时函数
-            function updateCountdown() {
-                const elapsed = Date.now() - startTime;
-                const remaining = Math.ceil((timeoutMs - elapsed) / 1000);
-                
-                if (remaining >= 0) {
-                    countdownText.textContent = `${remaining}秒后超时`;
-                }
-            }
-            
-            // 初始更新
-            updateCountdown();
-            
-            // 每秒更新倒计时
-            const countdownInterval = setInterval(updateCountdown, 1000);
-            
-            // 设置超时时间
-            const timeout = setTimeout(() => {
-                console.warn('解析接口超时');
-                clearInterval(countdownInterval);
-                resolve(null); // 超时返回null表示解析失败
-            }, timeoutMs);
-            
-            // 创建 XMLHttpRequest 对象
-            const xhr = new XMLHttpRequest();
-            
-            // 构造解析接口URL
-            const parseApi = 'https://proxy.kansha.icu?proxy_url=https://json.789jiexi.com/?url=' + encodeURIComponent(url);
+    const parseApis = [
+        { url: 'https://proxy.kansha.icu?proxy_url=https://json.789jiexi.com/?url=', name: '默认接口' },
+        { url: 'https://proxy.kansha.icu?proxy_url=https://json-vipjx.952707.xyz/?url=', name: '备用接口' },
+    ];
 
-            xhr.open('GET', parseApi, true);
-            
-            xhr.onreadystatechange = function() {
+    let art = null;
+
+    /* --------------------------
+       UI 控制
+    --------------------------- */
+    function showLoading(text = "正在解析视频地址...") {
+        const loading = document.getElementById('loadingMessage');
+        const loadingText = document.getElementById('loadingText');
+
+        if (!loading) return;
+        loading.classList.add("show");
+        if (loadingText) loadingText.textContent = text;
+    }
+
+    function hideLoading() {
+        const loading = document.getElementById('loadingMessage');
+        if (!loading) return;
+        loading.classList.remove("show");
+    }
+
+    function showError(msg) {
+        hideLoading();
+        const el = document.getElementById('errorMessage');
+        if (el) {
+            el.textContent = msg;
+            el.classList.add('show');
+        }
+    }
+
+    function showPlayError() {
+        hideLoading();
+        const el = document.getElementById('playErrorMessage');
+        if (el) el.classList.add('show');
+
+        if (art) {
+            try { art.destroy(); } catch (e) {}
+            art = null;
+        }
+    }
+
+    /* --------------------------
+       解析逻辑（带自动切换）
+    --------------------------- */
+    function parseWithFallback(apiIndex, originalUrl) {
+        return new Promise(resolve => {
+
+            if (!needParse(originalUrl)) {
+                return resolve({ url: originalUrl, apiIndex: -1 });
+            }
+
+            if (apiIndex >= parseApis.length) {
+                return resolve(null);
+            }
+
+            const api = parseApis[apiIndex];
+            const fullUrl = api.url + encodeURIComponent(originalUrl);
+
+            showLoading(`正在解析... (${api.name})`);
+
+            const xhr = new XMLHttpRequest();
+            const timeout = setTimeout(() => {
+                xhr.abort();
+                resolve(parseWithFallback(apiIndex + 1, originalUrl));
+            }, 15000);
+
+            xhr.open('GET', fullUrl, true);
+            xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
-                    // 清除倒计时
-                    clearInterval(countdownInterval);
-                    
-                    // 隐藏加载提示
-                    loadingMessage.classList.remove('show');
                     clearTimeout(timeout);
-                    if (xhr.status === 200) {
-                        try {
-                            const result = JSON.parse(xhr.responseText);
-                            console.log('解析接口返回数据:', result); // 打印返回数据
-                            
-                            if (result.code === 200 && result.url) {
-                                resolve(result.url);
-                            } else {
-                                // 解析失败，使用原始链接
-                                console.error('视频解析失败:', result.msg);
-                                resolve(null); // 返回null表示解析失败
-                            }
-                        } catch (e) {
-                            // 解析响应出错，使用原始链接
-                            console.error('解析响应错误:', e);
-                            resolve(null); // 返回null表示解析失败
-                        }
-                    } else {
-                        // 请求失败，使用原始链接
-                        console.error('解析请求失败，状态码:', xhr.status);
-                        resolve(null); // 返回null表示解析失败
+                    hideLoading();
+
+                    if (xhr.status !== 200) {
+                        return resolve(parseWithFallback(apiIndex + 1, originalUrl));
                     }
+
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.code === 200 && data.url) {
+                            return resolve({ url: data.url, apiIndex });
+                        }
+                    } catch (e) {}
+
+                    resolve(parseWithFallback(apiIndex + 1, originalUrl));
                 }
             };
-            
-            xhr.onerror = function() {
-                // 清除倒计时
-                clearInterval(countdownInterval);
-                
-                // 隐藏加载提示
-                loadingMessage.classList.remove('show');
+
+            xhr.onerror = function () {
                 clearTimeout(timeout);
-                // 网络错误，使用原始链接
-                console.error('解析请求网络错误');
-                resolve(null); // 返回null表示解析失败
+                hideLoading();
+                resolve(parseWithFallback(apiIndex + 1, originalUrl));
             };
-            
+
             xhr.send();
         });
     }
 
-    // 初始化播放器的函数
-    function initPlayer(url) {
-        const art = new Artplayer({
-            container: '.artplayer-app',
+    /* --------------------------
+       初始化播放器
+    --------------------------- */
+    function initPlayer(parsedResult, originalUrl) {
+        if (!parsedResult) {
+            return showError("解析失败，请更换其他线路！");
+        }
+
+        const { url, apiIndex } = parsedResult;
+
+        hideLoading();
+
+        document.getElementById("playerContainer").innerHTML = "";
+
+        art = new Artplayer({
+            container: '#playerContainer',
             url: url,
             autoplay: true,
             playsInline: true,
-            fullscreen: true,
-            pip: true,
-            theme: '#23ade5',
-            fastForward: true,
-            lock: true,
-            //autoSize: true,
-            airplay: true,
-            //fullscreenWeb: true,
-            autoOrientation: true,
-            autoMini: true,
-            flip: true,
-            playbackRate: true,
-            aspectRatio: true,
-            screenshot: true,
-            hotkey: true,
-            setting: true,
             customType: {
-                m3u8: function (video, url, art) {
+                m3u8: function(video, url, artInstance) {
+
                     if (Hls.isSupported()) {
                         const hls = new Hls();
                         hls.loadSource(url);
@@ -232,135 +229,63 @@
 
                         let errorCount = 0;
 
-                        // 监听HLS错误事件
-                        hls.on(Hls.Events.ERROR, function (event, data) {
-                            if (data.fatal) {
-                                errorCount++;
-                                // 如果错误次数过多，显示错误提示
-                                if (errorCount > 2) {
-                                    showPlayError();
-                                    return;
-                                }
+                        hls.on(Hls.Events.ERROR, (_, data) => {
+                            if (!data.fatal) return;
 
-                                switch(data.type) {
-                                    case Hls.ErrorTypes.NETWORK_ERROR:
-                                        // 网络错误，尝试恢复
-                                        console.warn('网络错误，尝试恢复...');
-                                        hls.startLoad();
-                                        break;
-                                    case Hls.ErrorTypes.MEDIA_ERROR:
-                                        // 媒体错误，尝试恢复
-                                        console.warn('媒体错误，尝试恢复...');
-                                        hls.recoverMediaError();
-                                        break;
-                                    default:
-                                        // 其他致命错误，显示错误提示
-                                        showPlayError();
-                                        break;
-                                }
+                            errorCount++;
+                            if (errorCount > 2) {
+                                artInstance.destroy();
+                                return parseNext(originalUrl, apiIndex);
+                            }
+
+                            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                hls.startLoad();
+                            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                hls.recoverMediaError();
+                            } else {
+                                artInstance.destroy();
+                                parseNext(originalUrl, apiIndex);
                             }
                         });
 
-                        // 监听 manifest 加载成功事件
-                        hls.on(Hls.Events.MANIFEST_LOADED, function() {
-                            console.log('视频资源加载成功');
-                        });
-
-                        // 监听播放失败事件
-                        hls.on(Hls.Events.ERROR, function (event, data) {
-                            if (!data.fatal && data.details === 'manifestLoadError') {
-                                console.warn('视频资源加载失败');
-                                showPlayError();
-                            }
-                        });
-
-                        art.on('destroy', () => hls.destroy());
-                    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                        video.src = url;
-                        // 监听原生HLS播放错误
-                        video.addEventListener('error', function() {
-                            showPlayError();
-                        });
+                        artInstance.on('destroy', () => hls.destroy());
                     } else {
-                        art.notice.show = '该浏览器不支持 m3u8 播放';
+                        video.src = url;
                     }
-                },
-            },
+                }
+            }
         });
 
-        // 监听播放错误事件
-        art.on('video:error', function() {
-            showPlayError();
-        });
-
-        // 监听播放状态变化
-        art.on('video:playing', function() {
-            // 视频开始播放，隐藏所有错误提示
-            document.getElementById('errorMessage').classList.remove('show');
-            document.getElementById('playErrorMessage').classList.remove('show');
-        });
-
-        // 监听播放尝试事件
-        art.on('play', function() {
-            // 开始尝试播放，隐藏错误提示
-            document.getElementById('errorMessage').classList.remove('show');
-            document.getElementById('playErrorMessage').classList.remove('show');
-        });
-
-        return art;
-    }
-
-    // 显示播放错误提示
-    function showPlayError() {
-        // 隐藏加载提示
-        const loadingMessage = document.getElementById('loadingMessage');
-        if (loadingMessage) {
-            loadingMessage.classList.remove('show');
-        }
-        
-        // 如果存在播放器实例，销毁它
-        if (typeof art !== 'undefined' && art && typeof art.destroy === 'function') {
+        art.on('video:error', () => {
             art.destroy();
-        }
-        
-        // 清空播放器容器
-        const playerContainer = document.querySelector('.artplayer-app');
-        if (playerContainer) {
-            playerContainer.innerHTML = '';
-            
-            // 创建并显示错误提示
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'message-overlay show';
-            errorDiv.id = 'playErrorMessage';
-            errorDiv.textContent = '视频无法播放，请更换其他线路！';
-            errorDiv.style.cssText = 'z-index: 9999; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); ' +
-                                   'background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px 40px; ' +
-                                   'border-radius: 8px; font-size: 18px; font-weight: bold; text-align: center;';
-            playerContainer.appendChild(errorDiv);
-        }
+            parseNext(originalUrl, apiIndex);
+        });
     }
 
-    // 根据链接类型决定如何播放
-    parseVideoUrl(videoUrl).then(function(parsedUrl) {
-        if (parsedUrl === null) {
-            // 解析失败，显示自定义错误提示
-            console.warn('视频解析失败，请更换其他线路！');
-            // 显示错误信息
-            const errorMessage = document.getElementById('errorMessage');
-            if (errorMessage) {
-                errorMessage.classList.add('show');
-            }
-        } else {
-            // 尝试播放解析后的URL
-            try {
-                initPlayer(parsedUrl);
-            } catch (e) {
-                console.error('播放器初始化失败:', e);
-                showPlayError();
-            }
-        }
-    });
-</script>
+    /* --------------------------
+       播放失败 → 自动切换接口
+    --------------------------- */
+    function parseNext(originalUrl, apiIndex) {
+        showLoading("正在尝试其他线路...");
+        parseWithFallback(apiIndex + 1, originalUrl)
+            .then(result => initPlayer(result, originalUrl));
+    }
 
+    /* --------------------------
+       入口
+    --------------------------- */
+    const videoUrl = getQuery('url');
+
+    if (!videoUrl) {
+        document.body.innerHTML =
+            '<h3 style="color:greenyellow;text-align:center;margin-top:40vh;">播放地址为空</h3>';
+        throw new Error("播放地址为空");
+    }
+
+    showLoading("正在解析...");
+    parseWithFallback(0, videoUrl)
+        .then(result => initPlayer(result, videoUrl));
+
+</script>
 </body>
 </html>
