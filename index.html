@@ -15,6 +15,42 @@
         .artplayer-app {
             width: 100%;
             height: 100vh;
+            position: relative;
+        }
+        
+        .message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 9999; /* 提高z-index确保在播放器上方 */
+            display: none;
+        }
+        
+        .message-overlay.show {
+            display: block;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 
@@ -24,7 +60,19 @@
 </head>
 <body>
 
-<div class="artplayer-app"></div>
+<div class="artplayer-app">
+    <div class="message-overlay show" id="loadingMessage">
+        <div class="loading-spinner"></div>
+        <div id="loadingText">正在解析视频地址...</div>
+        <div id="countdownText"></div>
+    </div>
+    <div class="message-overlay" id="errorMessage">
+        播放失败，请更换其他线路！
+    </div>
+    <div class="message-overlay" id="playErrorMessage">
+        视频无法播放，请更换其他线路！
+    </div>
+</div>
 
 <script>
     // 读取 URL 参数
@@ -40,43 +88,278 @@
         throw new Error("播放地址为空");
     }
 
-    const art = new Artplayer({
-        container: '.artplayer-app',
-        url: videoUrl,
-        autoplay: true,
-        playsInline: true,
-        fullscreen: true,
-        pip: true,
-        theme: '#23ade5',
-        fastForward: true,
-        lock: true,
-        //autoSize: true,
-        airplay: true,
-        //fullscreenWeb: true,
-        autoOrientation: true,
-        autoMini: true,
-        flip: true,
-        playbackRate: true,
-        aspectRatio: true,
-        screenshot: true,
-        hotkey: true,
-        setting: true,
-        customType: {
-            m3u8: function (video, url, art) {
-                if (Hls.isSupported()) {
-                    const hls = new Hls();
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
-                    art.on('destroy', () => hls.destroy());
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = url;
-                } else {
-                    art.notice.show = '该浏览器不支持 m3u8 播放';
-                }
-            },
-        },
-    });
+    // 检查是否为需要解析的视频网站链接
+    function needParse(url) {
+        const sites = [
+            'v.qq.com',
+            'iqiyi.com',
+            'youku.com',
+            'mgtv.com',
+            'bilibili.com'
+        ];
+        
+        return sites.some(site => url.includes(site));
+    }
 
+    // 使用普通 AJAX 解析视频链接
+    function parseVideoUrl(url) {
+        return new Promise((resolve) => {
+            if (!needParse(url)) {
+                // 不需要解析的链接直接 resolve
+                resolve(url);
+                return;
+            }
+            
+            // 显示加载提示
+            const loadingMessage = document.getElementById('loadingMessage');
+            const loadingText = document.getElementById('loadingText');
+            const countdownText = document.getElementById('countdownText');
+            loadingMessage.classList.add('show');
+            
+            // 设置超时时间
+            const timeoutMs = 20000; // 20秒超时
+            const startTime = Date.now();
+            
+            // 更新倒计时函数
+            function updateCountdown() {
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.ceil((timeoutMs - elapsed) / 1000);
+                
+                if (remaining >= 0) {
+                    countdownText.textContent = `${remaining}秒后超时`;
+                }
+            }
+            
+            // 初始更新
+            updateCountdown();
+            
+            // 每秒更新倒计时
+            const countdownInterval = setInterval(updateCountdown, 1000);
+            
+            // 设置超时时间
+            const timeout = setTimeout(() => {
+                console.warn('解析接口超时');
+                clearInterval(countdownInterval);
+                resolve(null); // 超时返回null表示解析失败
+            }, timeoutMs);
+            
+            // 创建 XMLHttpRequest 对象
+            const xhr = new XMLHttpRequest();
+            
+            // 构造解析接口URL
+            const parseApi = 'https://proxy.kansha.icu?proxy_url=https://json.789jiexi.com/?url=' + encodeURIComponent(url);
+
+            xhr.open('GET', parseApi, true);
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    // 清除倒计时
+                    clearInterval(countdownInterval);
+                    
+                    // 隐藏加载提示
+                    loadingMessage.classList.remove('show');
+                    clearTimeout(timeout);
+                    if (xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            console.log('解析接口返回数据:', result); // 打印返回数据
+                            
+                            if (result.code === 200 && result.url) {
+                                resolve(result.url);
+                            } else {
+                                // 解析失败，使用原始链接
+                                console.error('视频解析失败:', result.msg);
+                                resolve(null); // 返回null表示解析失败
+                            }
+                        } catch (e) {
+                            // 解析响应出错，使用原始链接
+                            console.error('解析响应错误:', e);
+                            resolve(null); // 返回null表示解析失败
+                        }
+                    } else {
+                        // 请求失败，使用原始链接
+                        console.error('解析请求失败，状态码:', xhr.status);
+                        resolve(null); // 返回null表示解析失败
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                // 清除倒计时
+                clearInterval(countdownInterval);
+                
+                // 隐藏加载提示
+                loadingMessage.classList.remove('show');
+                clearTimeout(timeout);
+                // 网络错误，使用原始链接
+                console.error('解析请求网络错误');
+                resolve(null); // 返回null表示解析失败
+            };
+            
+            xhr.send();
+        });
+    }
+
+    // 初始化播放器的函数
+    function initPlayer(url) {
+        const art = new Artplayer({
+            container: '.artplayer-app',
+            url: url,
+            autoplay: true,
+            playsInline: true,
+            fullscreen: true,
+            pip: true,
+            theme: '#23ade5',
+            fastForward: true,
+            lock: true,
+            //autoSize: true,
+            airplay: true,
+            //fullscreenWeb: true,
+            autoOrientation: true,
+            autoMini: true,
+            flip: true,
+            playbackRate: true,
+            aspectRatio: true,
+            screenshot: true,
+            hotkey: true,
+            setting: true,
+            customType: {
+                m3u8: function (video, url, art) {
+                    if (Hls.isSupported()) {
+                        const hls = new Hls();
+                        hls.loadSource(url);
+                        hls.attachMedia(video);
+
+                        let errorCount = 0;
+
+                        // 监听HLS错误事件
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            if (data.fatal) {
+                                errorCount++;
+                                // 如果错误次数过多，显示错误提示
+                                if (errorCount > 2) {
+                                    showPlayError();
+                                    return;
+                                }
+
+                                switch(data.type) {
+                                    case Hls.ErrorTypes.NETWORK_ERROR:
+                                        // 网络错误，尝试恢复
+                                        console.warn('网络错误，尝试恢复...');
+                                        hls.startLoad();
+                                        break;
+                                    case Hls.ErrorTypes.MEDIA_ERROR:
+                                        // 媒体错误，尝试恢复
+                                        console.warn('媒体错误，尝试恢复...');
+                                        hls.recoverMediaError();
+                                        break;
+                                    default:
+                                        // 其他致命错误，显示错误提示
+                                        showPlayError();
+                                        break;
+                                }
+                            }
+                        });
+
+                        // 监听 manifest 加载成功事件
+                        hls.on(Hls.Events.MANIFEST_LOADED, function() {
+                            console.log('视频资源加载成功');
+                        });
+
+                        // 监听播放失败事件
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            if (!data.fatal && data.details === 'manifestLoadError') {
+                                console.warn('视频资源加载失败');
+                                showPlayError();
+                            }
+                        });
+
+                        art.on('destroy', () => hls.destroy());
+                    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                        video.src = url;
+                        // 监听原生HLS播放错误
+                        video.addEventListener('error', function() {
+                            showPlayError();
+                        });
+                    } else {
+                        art.notice.show = '该浏览器不支持 m3u8 播放';
+                    }
+                },
+            },
+        });
+
+        // 监听播放错误事件
+        art.on('video:error', function() {
+            showPlayError();
+        });
+
+        // 监听播放状态变化
+        art.on('video:playing', function() {
+            // 视频开始播放，隐藏所有错误提示
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('playErrorMessage').classList.remove('show');
+        });
+
+        // 监听播放尝试事件
+        art.on('play', function() {
+            // 开始尝试播放，隐藏错误提示
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('playErrorMessage').classList.remove('show');
+        });
+
+        return art;
+    }
+
+    // 显示播放错误提示
+    function showPlayError() {
+        // 隐藏加载提示
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.classList.remove('show');
+        }
+        
+        // 如果存在播放器实例，销毁它
+        if (typeof art !== 'undefined' && art && typeof art.destroy === 'function') {
+            art.destroy();
+        }
+        
+        // 清空播放器容器
+        const playerContainer = document.querySelector('.artplayer-app');
+        if (playerContainer) {
+            playerContainer.innerHTML = '';
+            
+            // 创建并显示错误提示
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'message-overlay show';
+            errorDiv.id = 'playErrorMessage';
+            errorDiv.textContent = '视频无法播放，请更换其他线路！';
+            errorDiv.style.cssText = 'z-index: 9999; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); ' +
+                                   'background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px 40px; ' +
+                                   'border-radius: 8px; font-size: 18px; font-weight: bold; text-align: center;';
+            playerContainer.appendChild(errorDiv);
+        }
+    }
+
+    // 根据链接类型决定如何播放
+    parseVideoUrl(videoUrl).then(function(parsedUrl) {
+        if (parsedUrl === null) {
+            // 解析失败，显示自定义错误提示
+            console.warn('视频解析失败，请更换其他线路！');
+            // 显示错误信息
+            const errorMessage = document.getElementById('errorMessage');
+            if (errorMessage) {
+                errorMessage.classList.add('show');
+            }
+        } else {
+            // 尝试播放解析后的URL
+            try {
+                initPlayer(parsedUrl);
+            } catch (e) {
+                console.error('播放器初始化失败:', e);
+                showPlayError();
+            }
+        }
+    });
 </script>
 
 </body>
