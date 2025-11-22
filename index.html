@@ -5,8 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>视频播放器</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+    <script src="./artplayer/js/hls.min.js"></script>
+    <script src="./artplayer/js/artplayer.js"></script>
+    <script src="./artplayer/js/artplayer-plugin-danmuku.js"></script>
 
     <style>
         body {
@@ -100,8 +101,8 @@
     }
 
     const parseApis = [
-        { url: 'https://proxy.kansha.icu?proxy_url=https://json.789jiexi.com/?url=', name: '默认接口' },
-        { url: 'https://proxy.kansha.icu?proxy_url=https://json-vipjx.952707.xyz/?url=', name: '备用接口' },
+        { url: 'https://proxy.kansha.icu?proxy_url=https://json.789jiexi.com/?url=', name: '第一次尝试' },
+        { url: 'https://proxy.kansha.icu?proxy_url=https://json-vipjx.952707.xyz/?url=', name: '第二次尝试' },
     ];
 
     let art = null;
@@ -214,11 +215,70 @@
 
         document.getElementById("playerContainer").innerHTML = "";
 
+        // 初始化弹幕插件
+        const danmukuPlugin = artplayerPluginDanmuku({
+            speed: 5,
+            opacity: 1,
+            fontSize: 20,
+            color: '#FFFFFF',
+            mode: 0,
+            margin: [10, '25%'],
+            antiOverlap: true,
+            maxLength: 300,
+            synchronousPlayback: false,
+            danmuku: function () {
+                return new Promise((resolve) => {
+                    // 获取视频URL
+                    const videoUrl = new URLSearchParams(window.location.search).get('url');
+                    if (videoUrl) {
+                        const danmuApi = 'https://api.danmu.icu/?ac=dm&url=' + encodeURIComponent(videoUrl);
+                        
+                        fetch(danmuApi)
+                            .then(res => res.json())
+                            .then(data => {
+                                console.log('弹幕数据', data);
+                                // 处理弹幕数据格式
+                                if (Array.isArray(data.danmuku)) {
+                                    // 转换弹幕数据格式以适配插件要求
+                                    const convertedDanmuku = data.danmuku.map(item => {
+                                        // 根据返回的数据结构进行转换
+                                        if (Array.isArray(item)) {
+                                            return {
+                                                text: item[4] || '',
+                                                time: item[0] || 0,
+                                                color: item[2] || '#FFFFFF',
+                                                mode: item[1] === 'top' ? 1 : item[1] === 'bottom' ? 2 : 0
+                                            };
+                                        } else {
+                                            // 如果已经是对象格式，直接返回
+                                            return item;
+                                        }
+                                    });
+                                    return resolve(convertedDanmuku);
+                                } else {
+                                    console.warn('弹幕数据格式不对', data);
+                                    return resolve([]);
+                                }
+                            })
+                            .catch(err => {
+                                console.error('弹幕加载失败', err);
+                                resolve([]);
+                            });
+                    } else {
+                        resolve([]);
+                    }
+                });
+            },
+        });
+
         art = new Artplayer({
             container: '#playerContainer',
             url: url,
             autoplay: true,
             playsInline: true,
+            plugins: [
+                danmukuPlugin,
+            ],
             customType: {
                 m3u8: function(video, url, artInstance) {
 
