@@ -8,6 +8,7 @@
     <script src="./artplayer/js/hls.min.js"></script>
     <script src="./artplayer/js/artplayer.js"></script>
     <script src="./artplayer/js/artplayer-plugin-danmuku.js"></script>
+    <script src="./artplayer/js/jxad.js"></script>
 
     <style>
         body {
@@ -20,7 +21,7 @@
 
         .artplayer-app {
             width: 100vw;
-            height: 100vh;
+            height: 100dvh;
             position: relative;
         }
 
@@ -350,13 +351,15 @@
     /* --------------------------
        入口
     --------------------------- */
-    const videoUrl = getQuery('url');
+    let videoUrl = getQuery('url');
 
     if (!videoUrl) {
         document.body.innerHTML =
             '<h3 style="color:greenyellow;text-align:center;margin-top:40vh;">播放地址为空</h3>';
         throw new Error("播放地址为空");
     }
+
+    videoUrl = get_JxUrl(videoUrl);
 
     showLoading("正在解析...");
     parseWithFallback(0, videoUrl)

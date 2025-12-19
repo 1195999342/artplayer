@@ -14,36 +14,68 @@ function get_JxUrl(urlo) {
         let content = urlData.content;
 
         let tsListArr = content.split('\n');
-        let tsIndexArr = []; // 需要删除的行
-        let lastNum = 0;     // 修复点：初始化为 0
 
-        for (let i = 0; i < tsListArr.length; i++) {
-            let line = tsListArr[i];
-            if (!line.endsWith('.ts')) continue;
+        // 专门处理 ff 类型：删除第二个和第三个 EXT-X-DISCONTINUITY 之间的内容
+        if (type === 'ff') {
+            let discontCount = 0;
+            let removeStart = -1;
+            let removeEnd = -1;
 
-            if (type === 'bf') {
-                if (line.includes('adjump')) {
-                    tsIndexArr.push(i, i - 1);
-                }
-            } else if (type === 'lz' || type === 'ff') {
-                // 取 ts 文件名后 6 位数字
-                let num = parseInt(line.replace(/.*?([0-9]{6})\.ts$/, '$1'));
-                if (!isNaN(num)) {
-                    if (num !== 0 && num !== lastNum + 1) {
-                        tsIndexArr.push(i - 1, i);
+            for (let i = 0; i < tsListArr.length; i++) {
+                let line = tsListArr[i];
+                if (line.includes('EXT-X-DISCONTINUITY')) {
+                    discontCount++;
+                    if (discontCount === 2 && removeStart === -1) {
+                        removeStart = i;
+                    } else if (discontCount === 3 && removeEnd === -1) {
+                        removeEnd = i;
+                        break;
                     }
-                    lastNum = num;
                 }
             }
-        }
 
-        // 去重 + 排序 ↓↓↓
-        tsIndexArr = [...new Set(tsIndexArr)].sort((a, b) => b - a);
-        tsIndexArr.forEach(index => {
-            if (index >= 0 && index < tsListArr.length) {
-                tsListArr.splice(index, 1);
+            // 如果找到了第二个和第三个 EXT-X-DISCONTINUITY，则删除它们之间的所有行（包括这两个标签）
+            if (removeStart !== -1 && removeEnd !== -1) {
+                tsListArr.splice(removeStart, removeEnd - removeStart + 1);
             }
-        });
+        } else {
+            // 其他类型的原有处理逻辑
+            let tsIndexArr = []; // 需要删除的行
+            let lastNum = 0;     // 修复点：初始化为 0
+
+            for (let i = 0; i < tsListArr.length; i++) {
+                let line = tsListArr[i];
+                if (!line.endsWith('.ts')) continue;
+
+                if (type === 'bf') {
+                    if (line.includes('adjump')) {
+                        tsIndexArr.push(i, i - 1);
+                    }
+                } else if (type === 'lz') {
+                    // 取 ts 文件名后 6 位数字
+                    let num = parseInt(line.replace(/.*?([0-9]{6})\.ts$/, '$1'));
+                    console.log('lz类型处理: 当前行=', line, '提取数字=', num, '上一个数字=', lastNum);
+                    if (!isNaN(num)) {
+                        if (num !== 0 && num !== lastNum + 1) {
+                            console.log('lz类型处理: 检测到不连续序列，推入索引:', i - 1, i);
+                            tsIndexArr.push(i - 1, i);
+                            continue
+                        }
+                        lastNum = num;
+                    } else {
+                        console.log('lz类型处理: 无法解析数字，当前行=', line);
+                    }
+                }
+            }
+
+            // 去重 + 排序 ↓↓↓
+            tsIndexArr = [...new Set(tsIndexArr)].sort((a, b) => b - a);
+            tsIndexArr.forEach(index => {
+                if (index >= 0 && index < tsListArr.length) {
+                    tsListArr.splice(index, 1);
+                }
+            });
+        }
 
         // 前缀（ts 所在目录）
         let base = urlo.replace(/\/[^\/]*$/, '');
