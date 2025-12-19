@@ -54,16 +54,13 @@ function get_JxUrl(urlo) {
                 } else if (type === 'lz') {
                     // 取 ts 文件名后 6 位数字
                     let num = parseInt(line.replace(/.*?([0-9]{6})\.ts$/, '$1'));
-                    console.log('lz类型处理: 当前行=', line, '提取数字=', num, '上一个数字=', lastNum);
                     if (!isNaN(num)) {
                         if (num !== 0 && num !== lastNum + 1) {
-                            console.log('lz类型处理: 检测到不连续序列，推入索引:', i - 1, i);
                             tsIndexArr.push(i - 1, i);
                             continue
                         }
                         lastNum = num;
                     } else {
-                        console.log('lz类型处理: 无法解析数字，当前行=', line);
                     }
                 }
             }
